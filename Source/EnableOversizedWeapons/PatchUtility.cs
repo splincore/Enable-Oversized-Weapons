@@ -12,7 +12,15 @@ namespace EnableOversizedWeapons
 
         public static Mesh GetMesh(Mesh mesh, Thing thing, float aimAngle)
         {
-            return MeshMakerPlanes.NewPlaneMesh(thing.def.graphicData.drawSize, (aimAngle > 200f && aimAngle < 340f), false, false);
+            if (thing.def.graphicData.drawSize == Vector2.one) return mesh;
+            if (aimAngle > 200f && aimAngle < 340f)
+            {
+                return MeshPool.GridPlaneFlip(thing.def.graphicData.drawSize);
+            }
+            else
+            {
+                return MeshPool.GridPlane(thing.def.graphicData.drawSize);
+            }
         }
     }
 }
