@@ -13,6 +13,10 @@ namespace EnableOversizedWeapons
         {
             var harmony = new Harmony("rimworld.carnysenpai.enableoversizedweapons");
             harmony.Patch(AccessTools.Method(typeof(PawnRenderer), "DrawEquipmentAiming"), null, null, new HarmonyMethod(typeof(HarmonyPatch).GetMethod("Transpiler_DrawEquipmentAiming")));
+            if (LoadedModManager.GetMod<EnableOversizedWeaponsMod>().GetSettings<EnableOversizedWeaponsModSettings>().removeNorthDrawOffsetFromEquipment)
+            {
+                harmony.Patch(AccessTools.Method(typeof(Graphic), "Print"), null, null, new HarmonyMethod(typeof(HarmonyPatch).GetMethod("Transpiler_Print")));
+            }
         }
 
         [HarmonyTranspiler]
@@ -47,6 +51,37 @@ namespace EnableOversizedWeapons
             yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(PatchUtility), "GetDrawOffset")); // stack: modified mesh, modified drawLoc
 
             for (int i = firstQuaternionIndex - 2; i < codes.Count; i++) // return everything after call
+            {
+                yield return codes[i];
+            }
+        }
+
+        [HarmonyTranspiler]
+        public static IEnumerable<CodeInstruction> Transpiler_Print(IEnumerable<CodeInstruction> instructions)
+        {
+            List<CodeInstruction> codes = new List<CodeInstruction>(instructions);
+            int firstDrawOffset = -1;
+            for (int i = 0; i < codes.Count; i++)
+            {
+                if (codes[i].operand.ToStringSafe().Contains("DrawOffset")) // searching ankerpoint "DrawOffset"
+                {
+                    firstDrawOffset = i;
+                    break;
+                }
+            }
+            for (int i = 0; i < firstDrawOffset + 3; i++) // return until (including) IL_00B1 
+            {
+                yield return codes[i];
+            }
+            // stack: -
+
+            // replaces mesh with a modified mesh which uses the drawSize as a factor
+            yield return new CodeInstruction(OpCodes.Ldloc_3); // stack: Vector3
+            yield return new CodeInstruction(OpCodes.Ldarg_2); // stack: Vector3, thing
+            yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(PatchUtility), "RemoveNorthDrawOffsetFromEquipment"));  // stack: Vector3
+            yield return new CodeInstruction(OpCodes.Stloc_3); // stack: -
+
+            for (int i = firstDrawOffset + 3; i < codes.Count; i++) // return everything after call
             {
                 yield return codes[i];
             }

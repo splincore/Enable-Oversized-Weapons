@@ -22,5 +22,11 @@ namespace EnableOversizedWeapons
                 return MeshPool.GridPlane(thing.def.graphicData.drawSize);
             }
         }
+
+        public static Vector3 RemoveNorthDrawOffsetFromEquipment(Vector3 drawLoc, Thing thing)
+        {
+            if (thing.Rotation == Rot4.North && thing.def.equipmentType == EquipmentType.Primary) drawLoc -= thing.def.graphicData.DrawOffsetForRot(Rot4.North);
+            return drawLoc;
+        }
     }
 }
