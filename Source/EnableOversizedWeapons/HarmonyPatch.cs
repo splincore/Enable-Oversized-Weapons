@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Reflection.Emit;
+using UnityEngine;
 using Verse;
 
 namespace EnableOversizedWeapons
@@ -12,48 +12,25 @@ namespace EnableOversizedWeapons
         static HarmonyPatch()
         {
             var harmony = new Harmony("rimworld.carnysenpai.enableoversizedweapons");
-            harmony.Patch(AccessTools.Method(typeof(PawnRenderer), "DrawEquipmentAiming"), null, null, new HarmonyMethod(typeof(HarmonyPatch).GetMethod("Transpiler_DrawEquipmentAiming")));
+            harmony.Patch(AccessTools.Method(typeof(PawnRenderer), "DrawEquipmentAiming"), new HarmonyMethod(typeof(HarmonyPatch).GetMethod("Prefix_Drawloc")), null, null);
             if (LoadedModManager.GetMod<EnableOversizedWeaponsMod>().GetSettings<EnableOversizedWeaponsModSettings>().removeNorthDrawOffsetFromEquipment)
             {
                 harmony.Patch(AccessTools.Method(typeof(Graphic), "Print"), null, null, new HarmonyMethod(typeof(HarmonyPatch).GetMethod("Transpiler_Print")));
             }
         }
 
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> Transpiler_DrawEquipmentAiming(IEnumerable<CodeInstruction> instructions)
+        [HarmonyPrefix]
+        public static bool Prefix_Drawloc(Thing eq, ref Vector3 drawLoc, Pawn ___pawn)
         {
-            List<CodeInstruction> codes = new List<CodeInstruction>(instructions);
-            int firstQuaternionIndex = -1;
-            for (int i = 0; i < codes.Count; i++)
+            if (eq.StyleDef != null && eq.StyleDef.graphicData != null)
             {
-                if (codes[i].operand.ToStringSafe().Contains("Quaternion")) // searching ankerpoint "Quaternion"
-                {
-                    firstQuaternionIndex = i;
-                    break;
-                }
+                drawLoc += eq.StyleDef.graphicData.DrawOffsetForRot(___pawn.Rotation);
             }
-            for (int i = 0; i < firstQuaternionIndex - 3; i++) // return until (including) jump target IL_00E3 
+            else
             {
-                yield return codes[i];
+                drawLoc += eq.def.graphicData.DrawOffsetForRot(___pawn.Rotation);
             }
-            // stack: mesh
-
-            // replaces mesh with a modified mesh which uses the drawSize as a factor
-            yield return new CodeInstruction(OpCodes.Ldarg_1); // stack: mesh, thing
-            yield return new CodeInstruction(OpCodes.Ldarg_3); // stack: mesh, thing, aimAngle
-            yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(PatchUtility), "GetMesh"));  // stack: modified mesh
-
-            // replaces drawLoc with a modified drawLoc, which uses the offsets as a factor
-            yield return new CodeInstruction(OpCodes.Ldarg_2); // stack: modified mesh, drawLoc
-            yield return new CodeInstruction(OpCodes.Ldarg_1); // stack: modified mesh, drawLoc, thing
-            yield return new CodeInstruction(OpCodes.Ldarg_0); // stack: modified mesh, drawLoc, thing, pawnrenderer
-            yield return new CodeInstruction(OpCodes.Ldfld, typeof(PawnRenderer).GetField("pawn", BindingFlags.GetField | BindingFlags.NonPublic | BindingFlags.Instance)); // stack: modified mesh, drawLoc, thing, pawn
-            yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(PatchUtility), "GetDrawOffset")); // stack: modified mesh, modified drawLoc
-
-            for (int i = firstQuaternionIndex - 2; i < codes.Count; i++) // return everything after call
-            {
-                yield return codes[i];
-            }
+            return true;
         }
 
         [HarmonyTranspiler]
@@ -69,7 +46,7 @@ namespace EnableOversizedWeapons
                     break;
                 }
             }
-            for (int i = 0; i < firstDrawOffset + 3; i++) // return until (including) IL_00B1 
+            for (int i = 0; i < firstDrawOffset + 3; i++) // return until (including) IL_00C5
             {
                 yield return codes[i];
             }
@@ -78,6 +55,7 @@ namespace EnableOversizedWeapons
             // replaces mesh with a modified mesh which uses the drawSize as a factor
             yield return new CodeInstruction(OpCodes.Ldloc_3); // stack: Vector3
             yield return new CodeInstruction(OpCodes.Ldarg_2); // stack: Vector3, thing
+            yield return new CodeInstruction(OpCodes.Ldarg_0); // stack: Vector3, thing, graphic
             yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(PatchUtility), "RemoveNorthDrawOffsetFromEquipment"));  // stack: Vector3
             yield return new CodeInstruction(OpCodes.Stloc_3); // stack: -
 
