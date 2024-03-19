@@ -12,7 +12,7 @@ namespace EnableOversizedWeapons
         static HarmonyPatch()
         {
             var harmony = new Harmony("rimworld.carnysenpai.enableoversizedweapons");
-            harmony.Patch(AccessTools.Method(typeof(PawnRenderer), "DrawEquipmentAiming"), new HarmonyMethod(typeof(HarmonyPatch).GetMethod("Prefix_Drawloc")), null, null);
+            harmony.Patch(AccessTools.Method(typeof(PawnRenderUtility), "DrawEquipmentAiming"), new HarmonyMethod(typeof(HarmonyPatch).GetMethod("Prefix_Drawloc")), null, null);
             if (LoadedModManager.GetMod<EnableOversizedWeaponsMod>().GetSettings<EnableOversizedWeaponsModSettings>().removeNorthDrawOffsetFromEquipment)
             {
                 harmony.Patch(AccessTools.Method(typeof(Graphic), "Print"), null, null, new HarmonyMethod(typeof(HarmonyPatch).GetMethod("Transpiler_Print")));
@@ -20,15 +20,33 @@ namespace EnableOversizedWeapons
         }
 
         [HarmonyPrefix]
-        public static bool Prefix_Drawloc(Thing eq, ref Vector3 drawLoc, Pawn ___pawn)
+        public static bool Prefix_Drawloc(Thing eq, ref Vector3 drawLoc)
         {
+            Pawn pawn = null;
+            CompEquippable compEquippable = eq.TryGetComp<CompEquippable>();
+            if (compEquippable != null)
+            {
+                ThingWithComps parent = compEquippable.parent;
+                Pawn_EquipmentTracker pawn_EquipmentTracker = ((parent != null) ? parent.ParentHolder : null) as Pawn_EquipmentTracker;
+                if (pawn_EquipmentTracker != null)
+                {
+                    if (pawn_EquipmentTracker.pawn == null)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        pawn = pawn_EquipmentTracker.pawn;
+                    }
+                }
+            }
             if (eq.StyleDef != null && eq.StyleDef.graphicData != null)
             {
-                drawLoc += eq.StyleDef.graphicData.DrawOffsetForRot(___pawn.Rotation);
+                drawLoc += eq.StyleDef.graphicData.DrawOffsetForRot(pawn.Rotation);
             }
             else
             {
-                drawLoc += eq.def.graphicData.DrawOffsetForRot(___pawn.Rotation);
+                drawLoc += eq.def.graphicData.DrawOffsetForRot(pawn.Rotation);
             }
             return true;
         }
